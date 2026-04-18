@@ -1,0 +1,121 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: candidates
+    // Document ID: auto-generated
+    // Fields:
+    //   - fullName: string (required, 1-100 chars)
+    //   - email: string (required, valid email)
+    //   - phone: string (optional)
+    //   - yearsOfExperience: number (optional, >= 0)
+    //   - keySkills: list of strings (optional, max 50 items)
+    //   - educationLevel: string (optional)
+    //   - jobPosition: string (optional)
+    //   - matchScore: number (optional, 0-100)
+    //   - summary: string (optional, max 2000 chars)
+    //   - strengths: list of strings (optional, max 20 items)
+    //   - weaknesses: list of strings (optional, max 20 items)
+    //   - status: string (required, enum: Applied, Screening, Interview, Offer, Hired, Rejected)
+    //   - createdAt: string (required, ISO 8601 format)
+    //   - rawText: string (optional, max 50000 chars)
+    //   - uid: string (required, immutable, matches auth.uid)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "tracquan26@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isValidCandidate(data) {
+      let requiredFields = ['fullName', 'email', 'status', 'uid', 'createdAt'];
+      let allowedFields = [
+        'fullName', 'email', 'phone', 'yearsOfExperience', 'keySkills', 
+        'educationLevel', 'jobPosition', 'matchScore', 'summary', 
+        'strengths', 'weaknesses', 'status', 'createdAt', 'rawText', 'uid'
+      ];
+      
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(allowedFields) &&
+             data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 100 &&
+             isValidEmail(data.email) &&
+             data.status in ['Applied', 'Screening', 'Interview', 'Offer', 'Hired', 'Rejected'] &&
+             data.uid == request.auth.uid &&
+             isValidDateString(data.createdAt) &&
+             (!('phone' in data) || data.phone is string) &&
+             (!('yearsOfExperience' in data) || (data.yearsOfExperience is number && data.yearsOfExperience >= 0)) &&
+             (!('keySkills' in data) || (data.keySkills is list && data.keySkills.size() <= 50)) &&
+             (!('matchScore' in data) || (data.matchScore is number && data.matchScore >= 0 && data.matchScore <= 100)) &&
+             (!('summary' in data) || (data.summary is string && data.summary.size() <= 2000)) &&
+             (!('strengths' in data) || (data.strengths is list && data.strengths.size() <= 20)) &&
+             (!('weaknesses' in data) || (data.weaknesses is list && data.weaknesses.size() <= 20)) &&
+             (!('rawText' in data) || (data.rawText is string && data.rawText.size() <= 50000));
+    }
+
+    function isValidUser(data) {
+      let requiredFields = ['uid', 'email', 'role'];
+      let allowedFields = ['uid', 'email', 'displayName', 'photoURL', 'role', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             data.keys().hasOnly(allowedFields) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'recruiter'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'recruiter';
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
+    }
+
+    match /candidates/{candidateId} {
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+      
+      allow create: if isAuthenticated() && 
+                      isValidCandidate(request.resource.data);
+      
+      allow update: if isAuthenticated() && 
+                      isOwner(resource.data.uid) &&
+                      isValidCandidate(request.resource.data) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.createdAt == resource.data.createdAt;
+      
+      allow delete: if isOwner(resource.data.uid) || isAdmin();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

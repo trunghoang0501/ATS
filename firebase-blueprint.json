@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "Candidate": {
+      "title": "Candidate",
+      "description": "A candidate in the recruitment pipeline",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "yearsOfExperience": { "type": "number" },
+        "keySkills": { "type": "array", "items": { "type": "string" } },
+        "educationLevel": { "type": "string" },
+        "jobPosition": { "type": "string" },
+        "matchScore": { "type": "number" },
+        "summary": { "type": "string" },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "weaknesses": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "rawText": { "type": "string" },
+        "uid": { "type": "string", "description": "The user ID who added this candidate" }
+      },
+      "required": ["fullName", "email", "status", "uid", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "recruiter"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/candidates/{candidateId}": {
+      "schema": "Candidate",
+      "description": "Recruitment candidates"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "V2.0 link to Firebase: TalentFlow ATS",
+  "description": "A modern Applicant Tracking System with AI-powered CV scanning, Kanban recruitment pipeline, and analytics dashboard.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
