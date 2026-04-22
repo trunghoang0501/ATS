@@ -38,10 +38,20 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    /** Matches App.tsx hardcoded admin; token must be verified Google email. */
+    function isAppointedAdminToken() {
+      return request.auth.token.email == "tracquan26@gmail.com" &&
+        request.auth.token.email_verified == true;
+    }
+
     function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "tracquan26@gmail.com" && request.auth.token.email_verified == true));
+      return isAuthenticated() && (
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        ) ||
+        isAppointedAdminToken()
+      );
     }
 
     function isValidEmail(email) {
@@ -93,8 +103,18 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'recruiter';
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (
+        request.resource.data.role == 'recruiter' ||
+        (request.resource.data.role == 'admin' && isAppointedAdminToken())
+      );
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && (
+        request.resource.data.role == resource.data.role ||
+        (
+          resource.data.role == 'recruiter' &&
+          request.resource.data.role == 'admin' &&
+          isAppointedAdminToken()
+        )
+      );
       allow delete: if isAdmin();
     }
 

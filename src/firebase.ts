@@ -6,6 +6,14 @@ import firebaseAppletConfig from '../firebase-applet-config.json';
 const isPlaceholder = (val: string | undefined) =>
   !val || val.includes('MY_') || val.includes('remixed-api-key') || val === '""' || val === "''";
 
+/** `getFirestore(app, "default")` hits a wrong DB id; use primary instance for the console default DB. */
+const resolveFirestoreDatabaseId = (id: string | undefined): string | undefined => {
+  if (!id || isPlaceholder(id)) return undefined;
+  const t = id.trim();
+  if (t === 'default' || t === '(default)') return undefined;
+  return t;
+};
+
 /** Per-field merge of env + firebase-applet-config breaks OAuth if any VITE_* is empty (two projects mixed). */
 const envFirebase = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string | undefined,
@@ -36,8 +44,7 @@ const resolveFirebase = (): ResolvedFirebase => {
     const measurementId = isPlaceholder(envFirebase.measurementId)
       ? undefined
       : envFirebase.measurementId;
-    const fid = envFirebase.firestoreDatabaseId;
-    const firestoreDatabaseId = fid && !isPlaceholder(fid) ? fid : undefined;
+    const firestoreDatabaseId = resolveFirestoreDatabaseId(envFirebase.firestoreDatabaseId);
 
     return {
       options: {
@@ -64,7 +71,7 @@ const resolveFirebase = (): ResolvedFirebase => {
       appId: firebaseAppletConfig.appId,
       ...(measurementId ? { measurementId } : {}),
     },
-    firestoreDatabaseId: firebaseAppletConfig.firestoreDatabaseId || undefined,
+    firestoreDatabaseId: resolveFirestoreDatabaseId(firebaseAppletConfig.firestoreDatabaseId),
   };
 };
 
