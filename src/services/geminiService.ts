@@ -2,9 +2,10 @@ import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { ExtractionResult } from "../types";
 import * as mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
+// Worker runs fingerprint code that calls `Uint8Array.prototype.toHex` (TC39); many browsers lack it → "n.toHex is not a function". Legacy worker ships the polyfill; main bundle stays standard.
+import pdfjsWorker from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
-// Set worker source using a CDN that matches the library version to avoid version mismatch errors
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: apiKey! });

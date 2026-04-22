@@ -155,6 +155,7 @@ import {
 import { cn } from './lib/utils';
 import { extractCandidateInfo, parseDocx, parsePdf } from './services/geminiService';
 import { Candidate, ExtractionResult, CandidateStatus } from './types';
+import { buildCandidateCreatePayload } from './utils/candidateFirestore';
 import { db, auth, signInWithGoogle, logout } from './firebase';
 
 type Section = 'scanner' | 'pipeline' | 'dashboard';
@@ -383,19 +384,26 @@ function AppContent() {
     if (!scanResult || !user) return;
     const path = 'candidates';
     try {
-      const newCandidate = {
-        ...scanResult,
-        status: 'Applied' as CandidateStatus,
-        createdAt: new Date().toISOString(),
-        rawText: rawText,
-        uid: user.uid
-      };
+      const newCandidate = buildCandidateCreatePayload(scanResult, user.uid, rawText, 'Applied');
       await addDoc(collection(db, path), newCandidate);
       setScanResult(null);
       setRawText('');
       setActiveSection('pipeline');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+    } catch (error: unknown) {
+      console.error('addCandidate:', error);
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: string }).code)
+          : '';
+      if (code === 'permission-denied') {
+        setError(
+          'Firestore blocked the save (permission-denied). Deploy `firestore.rules` to this project/database, or open DevTools → Network for the failing request.'
+        );
+      } else {
+        setError(
+          error instanceof Error ? error.message : 'Could not save the candidate. Check the console and Firestore setup.'
+        );
+      }
     }
   };
 
