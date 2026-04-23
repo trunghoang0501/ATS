@@ -1,4 +1,14 @@
-import type { CandidateStatus, ExtractionResult } from '../types';
+import { Timestamp } from 'firebase/firestore';
+import type { Candidate, CandidateStatus, ExtractionResult } from '../types';
+
+const STATUSES: CandidateStatus[] = [
+  'Applied',
+  'Screening',
+  'Interview',
+  'Offer',
+  'Hired',
+  'Rejected',
+];
 
 function asStringList(v: unknown, maxLen: number): string[] {
   if (!Array.isArray(v)) return [];
@@ -46,5 +56,42 @@ export function buildCandidateCreatePayload(
     createdAt: new Date().toISOString(),
     rawText: raw,
     uid,
+  };
+}
+
+function createdAtToIso(v: unknown): string {
+  if (typeof v === 'string' && v.length > 0) return v;
+  if (v instanceof Timestamp) return v.toDate().toISOString();
+  return new Date(0).toISOString();
+}
+
+function asCandidateStatus(v: unknown): CandidateStatus {
+  return STATUSES.includes(v as CandidateStatus) ? (v as CandidateStatus) : 'Applied';
+}
+
+/** Maps Firestore documents to `Candidate` so UI filters never crash on missing/shape drift. */
+export function normalizeCandidateFromFirestore(id: string, raw: Record<string, unknown>): Candidate {
+  let matchScore = Number(raw.matchScore);
+  if (!Number.isFinite(matchScore)) matchScore = 0;
+  let years = Number(raw.yearsOfExperience);
+  if (!Number.isFinite(years)) years = 0;
+
+  return {
+    id,
+    fullName: String(raw.fullName ?? ''),
+    email: String(raw.email ?? ''),
+    phone: typeof raw.phone === 'string' ? raw.phone : '',
+    yearsOfExperience: Math.max(0, years),
+    keySkills: asStringList(raw.keySkills, 50),
+    educationLevel: String(raw.educationLevel ?? ''),
+    jobPosition: String(raw.jobPosition ?? ''),
+    matchScore: Math.max(0, Math.min(100, Math.round(matchScore))),
+    summary: String(raw.summary ?? ''),
+    strengths: asStringList(raw.strengths, 20),
+    weaknesses: asStringList(raw.weaknesses, 20),
+    status: asCandidateStatus(raw.status),
+    createdAt: createdAtToIso(raw.createdAt),
+    rawText: typeof raw.rawText === 'string' ? raw.rawText : undefined,
+    uid: String(raw.uid ?? ''),
   };
 }

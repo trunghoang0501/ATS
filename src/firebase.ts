@@ -1,5 +1,12 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  getAuth,
+  GoogleAuthProvider,
+  initializeAuth,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseAppletConfig from '../firebase-applet-config.json';
 
@@ -78,7 +85,16 @@ const resolveFirebase = (): ResolvedFirebase => {
 const { options: firebaseOptions, firestoreDatabaseId } = resolveFirebase();
 
 const app = initializeApp(firebaseOptions);
-export const auth = getAuth(app);
+
+function createWebAuth() {
+  try {
+    return initializeAuth(app, { persistence: browserLocalPersistence });
+  } catch {
+    return getAuth(app);
+  }
+}
+
+export const auth = createWebAuth();
 export const db = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 

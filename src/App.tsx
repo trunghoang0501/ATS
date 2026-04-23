@@ -155,7 +155,7 @@ import {
 import { cn } from './lib/utils';
 import { extractCandidateInfo, parseDocx, parsePdf } from './services/geminiService';
 import { Candidate, ExtractionResult, CandidateStatus } from './types';
-import { buildCandidateCreatePayload } from './utils/candidateFirestore';
+import { buildCandidateCreatePayload, normalizeCandidateFromFirestore } from './utils/candidateFirestore';
 import { db, auth, signInWithGoogle, logout } from './firebase';
 
 type Section = 'scanner' | 'pipeline' | 'dashboard';
@@ -272,18 +272,24 @@ function AppContent() {
       : query(collection(db, path), where('uid', '==', user.uid));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      })) as Candidate[];
-      setCandidates(docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      const docs = snapshot.docs.map((d) =>
+        normalizeCandidateFromFirestore(d.id, d.data() as Record<string, unknown>)
+      );
+      setCandidates(
+        docs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      );
     }, (err) => {
-      // If permission denied on 'all' view, fallback to 'my' view
       if (err.code === 'permission-denied' && viewMode === 'all') {
         setViewMode('my');
-      } else {
-        handleFirestoreError(err, OperationType.GET, path);
+        return;
       }
+      console.error('Candidates listener:', err);
+      setError(
+        err.code === 'permission-denied'
+          ? 'Could not load candidates (permission denied). Check Firestore rules and that you are signed in.'
+          : 'Could not load candidates from Firestore. See console for details.'
+      );
+      setCandidates([]);
     });
 
     return () => unsubscribe();
@@ -453,9 +459,11 @@ function AppContent() {
   };
 
   const filteredCandidates = useMemo(() => {
-    return candidates.filter(c => 
-      c.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.keySkills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+    const q = searchQuery.toLowerCase();
+    return candidates.filter(
+      (c) =>
+        (c.fullName ?? '').toLowerCase().includes(q) ||
+        (c.keySkills ?? []).some((s) => (s ?? '').toLowerCase().includes(q))
     );
   }, [candidates, searchQuery]);
 
