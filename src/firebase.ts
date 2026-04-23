@@ -1,12 +1,5 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
-import {
-  browserLocalPersistence,
-  getAuth,
-  GoogleAuthProvider,
-  initializeAuth,
-  signInWithPopup,
-  signOut,
-} from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseAppletConfig from '../firebase-applet-config.json';
 
@@ -86,15 +79,8 @@ const { options: firebaseOptions, firestoreDatabaseId } = resolveFirebase();
 
 const app = initializeApp(firebaseOptions);
 
-function createWebAuth() {
-  try {
-    return initializeAuth(app, { persistence: browserLocalPersistence });
-  } catch {
-    return getAuth(app);
-  }
-}
-
-export const auth = createWebAuth();
+/** Use `getAuth` (not `initializeAuth` without full popup config) — avoids `auth/argument-error` on `signInWithPopup`. Web default persistence is already local. */
+export const auth = getAuth(app);
 export const db = firestoreDatabaseId ? getFirestore(app, firestoreDatabaseId) : getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
